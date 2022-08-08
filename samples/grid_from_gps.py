@@ -8,20 +8,24 @@ import sys
 import threading
 from datetime import datetime
 import serial
-import logging
+import logging   # https://docs.python.org/3/library/logging.html
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pywsjtx
 import pywsjtx.extra.simple_server
 import pywsjtx.extra.latlong_to_grid_square
 
-# Windows communications port we're using.
-# TODO: gpsd on linux
+# Windows communications port for GPS or Griduino hardware
+GPS = {'port':'COM53',   # GPS device port
+       'rate':115200 }   # GPS device baud rate
 
-COMPORT = 'COM8'
-IP_ADDRESS = '224.1.1.1'
-PORT = 5007
-logging.basicConfig(level=logging.DEBUG)
+# WSJT-X UDP multicast settings
+MULTICAST = {'ip_address':'224.0.0.1',   # WSJT address for UDP server
+             'port':2237 }               # WSJT port for UDP server, 2237 is default
+
+logging.basicConfig(level=logging.WARNING)  # 30
+#logging.basicConfig(level=logging.INFO)     # 20
+#logging.basicConfig(level=logging.DEBUG)    # 10
 
 class NMEALocation(object):
     # parse the NMEA message for location into a grid square
@@ -34,9 +38,12 @@ class NMEALocation(object):
 
     def handle_serial(self,text):
         # should be a single line.
-        if text.startswith('$GPGLL'):
-            logging.debug('nmea sentence: {}'.format(text.rstrip()))
-            grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.GPGLL_to_grid(text)
+        if text.startswith('$GPGLL') or text.startswith('$GPGGA'):
+            logging.debug('nmea gps sentence: {}'.format(text.rstrip()))
+            if text.startswith('$GPGLL'):
+                grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.GPGLL_to_grid(text)
+            if text.startswith('$GPGGA'):
+                grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.GPGGA_to_grid(text)
 
             if grid != "":
                 self.valid = True
@@ -65,8 +72,10 @@ class SerialGPS(object):
 
     def open(self, comport, baud, line_handler, **serial_kwargs):
         if self.comm_device is not None:
+            logging.warning('serial: GPS comm_device already open')
             self.close()
         self.stop_signalled = False
+        logging.info('serial: opening {} at {}'.format(GPS['port'],GPS['rate']))
         self.comm_device = serial.Serial(comport, baud, **serial_kwargs)
         if self.comm_device is not None:
             self.add_handler(line_handler)
@@ -124,9 +133,9 @@ def example_callback(new_grid):
 
 sgps = SerialGPS()
 
-s = pywsjtx.extra.simple_server.SimpleServer(IP_ADDRESS,PORT)
+print("Starting wsjt-x UDP server on {} port {}".format(MULTICAST['ip_address'], MULTICAST['port']))
+s = pywsjtx.extra.simple_server.SimpleServer(MULTICAST['ip_address'], MULTICAST['port'])
 
-print("Starting wsjt-x message server")
 
 while True:
 
@@ -136,11 +145,12 @@ while True:
         if wsjtx_id is None and (type(the_packet) == pywsjtx.HeartBeatPacket):
             # we have an instance of WSJTX
             print("wsjtx detected, id is {}".format(the_packet.wsjtx_id))
-            print("starting gps monitoring")
             wsjtx_id = the_packet.wsjtx_id
+
             # start up the GPS reader
+            print("starting gps monitoring")
             nmea_p = NMEALocation(example_callback)
-            sgps.open(COMPORT, 9600, nmea_p.handle_serial, timeout=1.2)
+            sgps.open(GPS['port'], GPS['rate'], nmea_p.handle_serial, timeout=1.2)
 
         if type(the_packet) == pywsjtx.StatusPacket:
             if gps_grid != "" and the_packet.de_grid != gps_grid:
