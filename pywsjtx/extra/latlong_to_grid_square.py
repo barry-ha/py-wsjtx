@@ -78,3 +78,19 @@ class LatLongToGridSquare(object):
        except GPSException:
            grid = ""
        return grid
+       
+    @classmethod
+    def GPGGA_to_grid(cls, GPGGAText):
+       # example: $GPGGA,042845.000,4745.1848,N,12217.0699,W,1,04,1.86,-0.1,M,-17.2,M,,*79\r\n
+       try:
+           components = GPGGAText.split(",")
+           if components[0]=='$GPGGA':
+               del components[0]
+           if components[5] != '1':
+               raise GPSException("Not a valid GPS fix")
+           lat = LatLongToGridSquare.convert_to_degrees(components[1], components[2])
+           long = LatLongToGridSquare.convert_to_degrees(components[3], components [4])
+           grid = LatLongToGridSquare.to_grid(lat, long)
+       except GPSException:
+           grid = ""
+       return grid
