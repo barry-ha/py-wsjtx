@@ -38,12 +38,9 @@ class NMEALocation(object):
 
     def handle_serial(self,text):
         # should be a single line.
-        if text.startswith('$GPGLL') or text.startswith('$GPGGA'):
+        if text.startswith('$GP'):
             logging.debug('nmea gps sentence: {}'.format(text.rstrip()))
-            if text.startswith('$GPGLL'):
-                grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.GPGLL_to_grid(text)
-            if text.startswith('$GPGGA'):
-                grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.GPGGA_to_grid(text)
+            grid = pywsjtx.extra.latlong_to_grid_square.LatLongToGridSquare.NMEA_to_grid(text)
 
             if grid != "":
                 self.valid = True

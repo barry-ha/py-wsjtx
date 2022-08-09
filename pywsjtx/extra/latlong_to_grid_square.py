@@ -64,6 +64,15 @@ class LatLongToGridSquare(object):
         return f_degrees
 
     @classmethod
+    def NMEA_to_grid(cls, nmea_text):
+        grid = ""
+        if nmea_text.startswith('$GPGLL'):
+            grid = LatLongToGridSquare.GPGLL_to_grid(nmea_text)
+        if nmea_text.startswith('$GPGGA'):
+            grid = LatLongToGridSquare.GPGGA_to_grid(nmea_text)
+        return grid
+
+    @classmethod
     def GPGLL_to_grid(cls, GPSLLText):
        # example: $GPGLL,4740.99254,N,12212.31179,W,223311.00,A,A*70\r\n
        try:
